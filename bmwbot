@@ -1,0 +1,61 @@
+from flask import Flask, request, jsonify
+from urllib.request import urlopen, Request
+from bs4 import BeautifulSoup
+import urllib
+
+ERROR_MESSAGE = '네트워크 접속에 문제가 발생하였습니다. 잠시 후 다시 시도해주세요.'
+
+
+app = Flask(__name__)
+
+
+@app.route('/weather', methods=['POST'])
+def weather():
+
+    req = request.get_json()
+
+    location = req["action"]["detailParams"]["sys_location"]["value"]
+
+    enc_loc = urllib.parse.quote(location + '+ 날씨')
+    el = str(enc_loc)
+    url = 'https://search.naver.com/search.naver'
+    url = url + '?sm=top_hty&fbm=1&ie=utf8&query='
+    url = url + el
+
+    req = Request(url)
+    page = urlopen(req)
+    html = page.read()
+    soup = BeautifulSoup(html, 'html.parser')
+    data1 = soup.find('div', {'class': 'weather_box'})
+    data2 = data1.findAll('dd')
+
+    find_address = data1.find('span', {'class':'btn_select'}).text
+    find_currenttemp = data1.find('span',{'class': 'todaytemp'}).text
+    find_dust = data2[0].find('span', {'class':'num'}).text
+    find_ultra_dust = data2[1].find('span', {'class':'num'}).text
+    find_ozone = data2[2].find('span', {'class':'num'}).text
+
+    all_info = ( ('현재 위치: '+ find_address)
+                +('현재 온도: '+ find_currenttemp +'℃') 
+                +('현재 미세먼지: ' + find_dust )
+                +('현재 초미세먼지: '+ find_ultra_dust)
+                +('현재 오존지수: '+ find_ozone))   
+    res = {
+        "version": "2.0",
+        "template": {
+            "outputs": [
+                {
+                    "simpleText": {
+                        "text": all_info
+                    }
+                }
+            ]
+        }
+    }
+    return jsonify(res)
+
+
+# 메인 함수
+if __name__ == '__main__':
+
+    app.run(host='0.0.0.0', port=5000, threaded=True)
